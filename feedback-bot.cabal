@@ -43,7 +43,6 @@ library
     Config
     Logging
     Server
-    Subscriber
     TelegramClientEnv
 
   -- other-modules:

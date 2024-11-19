@@ -5,7 +5,6 @@
 
 module Server where
 
--- import Config
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Aeson
 import Data.Maybe (fromMaybe)
@@ -17,7 +16,6 @@ import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Cors
 import Servant
 import Servant.Client (ClientEnv, runClientM)
-import Subscriber hiding (channels)
 import Telegram.Bot.API (SomeChatId (..), defSendMessage, sendMessage)
 
 data Feedback = Feedback
@@ -25,39 +23,37 @@ data Feedback = Feedback
     , phone :: Text
     , email :: Maybe Text
     , message :: Text
+    , channel :: Text
     }
     deriving (Generic, Show)
 
 instance FromJSON Feedback
 
 feedbackToMessage :: Feedback -> Text
-feedbackToMessage (Feedback n p e t) = T.unlines [n, p, fromMaybe "" e, t]
+feedbackToMessage (Feedback n p e t _) = T.unlines [n, p, fromMaybe "" e, t]
 
-sendMessageOneSubscriber :: ClientEnv -> Text -> String -> IO ()
+sendMessageOneSubscriber :: ClientEnv -> Text -> Text -> IO ()
 sendMessageOneSubscriber env msg chatId = do
     _ <-
         runClientM
-            (sendMessage $ defSendMessage (SomeChatUsername $ T.pack chatId) msg)
+            (sendMessage $ defSendMessage (SomeChatUsername chatId) msg)
             env
     pure ()
 
-server :: ClientEnv -> [Subscriber] -> Server API
-server env subscribers = pure True :<|> distribution
+server :: ClientEnv -> Server API
+server env = pure True :<|> distribution
   where
-    distribution :: Maybe String -> Feedback -> Handler Bool
-    distribution maybeOrigin f = do
+    distribution :: Feedback -> Handler Bool
+    distribution f = do
         liftIO $ do
-            print maybeOrigin -- TODO: все принты, putStrLn-ы это плохо. Есть библиотеки логов. Для начала можно посмотреть katip или co-log, они возможно уже не модные но дело свое делают. В системах эффектов идут свои встроенные библиотеки логов.
+            -- TODO: все принты, putStrLn-ы это плохо. Есть библиотеки логов. Для начала можно посмотреть katip или co-log, они возможно уже не модные но дело свое делают. В системах эффектов идут свои встроенные библиотеки логов.
             -- по хорошему все что шлет аппликуха в stdout должно быть определенным образом форматированными json-ами, чтобы потом можно было разобрать
             -- это в каком нибудь elastic search или в куберских дашбордах по логам приложения
-            let channels = sitesToChannels (fromMaybe "" maybeOrigin) subscribers
-            print channels
-            mapM_ (sendMessageOneSubscriber env $ feedbackToMessage f) channels
+            sendMessageOneSubscriber env (feedbackToMessage f) $ channel f
         pure True
 
 type APIFeedback =
     "feedback"
-        :> Header "origin" String -- TODO: почему заголовок? Причем заголовок, который зарезервирован в стандарте под другое. Лучше добавить поле в Feedback. Заодно Maybe уберешь.
         :> ReqBody '[JSON] Feedback
         :> Post '[JSON] Bool
 
@@ -81,10 +77,10 @@ middleware =
 -- В более хитрых подходах типа эффектфул делают вообще сказочные штуки типа разбивания этого окружения на конкретные окружения.
 -- Тут надо созвониться, соориентировать.
 -- Ну то есть это норм, работать будет но выглядит некрасиво и тяжело масштабируется.
-app :: ClientEnv -> [Subscriber] -> Application
-app env = middleware . serve (Proxy :: Proxy API) . server env
+app :: ClientEnv -> Application
+app = middleware . serve (Proxy :: Proxy API) . server
 
-runServer :: Int -> ClientEnv -> [Subscriber] -> IO ()
-runServer port env ss = do
+runServer :: Int -> ClientEnv -> IO ()
+runServer port env = do
     putStrLn $ "Server started:" <> show port
-    run port (app env ss) -- TODO: утащить порт в конфиг
+    run port (app env)
