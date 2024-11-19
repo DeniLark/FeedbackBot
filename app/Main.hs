@@ -13,9 +13,8 @@ main = do
         case ec of
             Left e -> logCrit loggerEnv $ showLS e
             Right config -> do
-                let subscribers = configSubscribers config
-                    port = configPort config
+                let port = configPort config
                 telegramEnv <- initClientEnv
                 case telegramEnv of
                     Nothing -> logCrit loggerEnv "Token not available"
-                    Just env -> runServer port env subscribers -- сюда бы добавить логирование но не хочется добавлять еще один аргумент
+                    Just env -> runServer port env -- сюда бы добавить логирование но не хочется добавлять еще один аргумент
