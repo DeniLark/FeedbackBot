@@ -32,8 +32,8 @@ instance FromJSON Feedback
 feedbackToMessage :: Feedback -> Text
 feedbackToMessage (Feedback n p e t _) = T.unlines [n, p, fromMaybe "" e, t]
 
-sendMessageOneSubscriber :: ClientEnv -> Text -> Text -> IO ()
-sendMessageOneSubscriber env msg chatId = do
+sendMessageOneChannel :: ClientEnv -> Text -> Text -> IO ()
+sendMessageOneChannel env msg chatId = do
     _ <-
         runClientM
             (sendMessage $ defSendMessage (SomeChatUsername chatId) msg)
@@ -49,7 +49,8 @@ server env = pure True :<|> distribution
             -- TODO: все принты, putStrLn-ы это плохо. Есть библиотеки логов. Для начала можно посмотреть katip или co-log, они возможно уже не модные но дело свое делают. В системах эффектов идут свои встроенные библиотеки логов.
             -- по хорошему все что шлет аппликуха в stdout должно быть определенным образом форматированными json-ами, чтобы потом можно было разобрать
             -- это в каком нибудь elastic search или в куберских дашбордах по логам приложения
-            sendMessageOneSubscriber env (feedbackToMessage f) $ channel f
+            let channels = T.words $ channel f
+            mapM_ (sendMessageOneChannel env (feedbackToMessage f)) channels
         pure True
 
 type APIFeedback =

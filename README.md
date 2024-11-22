@@ -16,6 +16,25 @@
 Server.hs - API сервер. Запускается на порту 8085 и прослушивает эндпойнт (метод POST)
 http://localhost:8085/feedback, в теле которого ожидает поля email и message
 
+# Использование
+```
+const object = {
+    email, 
+    message, 
+    name, 
+    phone, 
+    channel: "@chatdeni2" // идентификатор ТГ канала
+    // channel: "@chatdeni @chatdeni2" // несколько ТГ каналов
+}
+
+fetch("http://localhost:8085/feedback", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json",
+    },
+    body: JSON.stringify(object),
+}).then(r => r.json()).then(console.log)
+```
 
 Для проверки работы можно использовать:
 
